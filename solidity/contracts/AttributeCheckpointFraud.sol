@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity >=0.8.0;
+pragma solidity ^0.6.0;
 
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {ECDSA} from "@openzeppelin/contracts/cryptography/ECDSA.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -30,25 +30,27 @@ contract AttributeCheckpointFraud is Ownable {
     using CheckpointLib for Checkpoint;
     using Address for address;
 
-    CheckpointFraudProofs public immutable checkpointFraudProofs =
-        new CheckpointFraudProofs();
+    CheckpointFraudProofs public checkpointFraudProofs;
 
     mapping(address => bool) public merkleTreeWhitelist;
 
-    mapping(address signer => mapping(bytes32 digest => Attribution))
-        internal _attributions;
+    mapping(address => mapping(bytes32 => Attribution)) internal _attributions;
+
+    constructor() public {
+        checkpointFraudProofs = new CheckpointFraudProofs();
+    }
 
     function _recover(
-        Checkpoint calldata checkpoint,
-        bytes calldata signature
+        Checkpoint memory checkpoint,
+        bytes memory signature
     ) internal pure returns (address signer, bytes32 digest) {
         digest = checkpoint.digest();
         signer = ECDSA.recover(digest, signature);
     }
 
     function _attribute(
-        bytes calldata signature,
-        Checkpoint calldata checkpoint,
+        bytes memory signature,
+        Checkpoint memory checkpoint,
         FraudType fraudType
     ) internal {
         (address signer, bytes32 digest) = _recover(checkpoint, signature);
@@ -63,8 +65,8 @@ contract AttributeCheckpointFraud is Ownable {
     }
 
     function attributions(
-        Checkpoint calldata checkpoint,
-        bytes calldata signature
+        Checkpoint memory checkpoint,
+        bytes memory signature
     ) external view returns (Attribution memory) {
         (address signer, bytes32 digest) = _recover(checkpoint, signature);
         return _attributions[signer][digest];
@@ -79,8 +81,8 @@ contract AttributeCheckpointFraud is Ownable {
     }
 
     function attributeWhitelist(
-        Checkpoint calldata checkpoint,
-        bytes calldata signature
+        Checkpoint memory checkpoint,
+        bytes memory signature
     ) external {
         require(
             checkpointFraudProofs.isLocal(checkpoint),
@@ -96,8 +98,8 @@ contract AttributeCheckpointFraud is Ownable {
     }
 
     function attributePremature(
-        Checkpoint calldata checkpoint,
-        bytes calldata signature
+        Checkpoint memory checkpoint,
+        bytes memory signature
     ) external {
         require(
             checkpointFraudProofs.isPremature(checkpoint),
@@ -108,10 +110,10 @@ contract AttributeCheckpointFraud is Ownable {
     }
 
     function attributeMessageId(
-        Checkpoint calldata checkpoint,
-        bytes32[TREE_DEPTH] calldata proof,
+        Checkpoint memory checkpoint,
+        bytes32[TREE_DEPTH] memory proof,
         bytes32 actualMessageId,
-        bytes calldata signature
+        bytes memory signature
     ) external {
         require(
             checkpointFraudProofs.isFraudulentMessageId(
@@ -126,9 +128,9 @@ contract AttributeCheckpointFraud is Ownable {
     }
 
     function attributeRoot(
-        Checkpoint calldata checkpoint,
-        bytes32[TREE_DEPTH] calldata proof,
-        bytes calldata signature
+        Checkpoint memory checkpoint,
+        bytes32[TREE_DEPTH] memory proof,
+        bytes memory signature
     ) external {
         require(
             checkpointFraudProofs.isFraudulentRoot(checkpoint, proof),
