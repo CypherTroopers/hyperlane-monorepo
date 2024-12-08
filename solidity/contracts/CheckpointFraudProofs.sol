@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity >=0.8.0;
+pragma solidity ^0.6.0;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
@@ -18,14 +18,13 @@ contract CheckpointFraudProofs {
     using CheckpointLib for Checkpoint;
     using Address for address;
 
-    mapping(address merkleTree => mapping(bytes32 root => StoredIndex index))
-        public storedCheckpoints;
+    mapping(address => mapping(bytes32 => StoredIndex)) public storedCheckpoints;
 
     function storedCheckpointContainsMessage(
         address merkleTree,
         uint32 index,
         bytes32 messageId,
-        bytes32[TREE_DEPTH] calldata proof
+        bytes32[TREE_DEPTH] memory proof
     ) public view returns (bool) {
         bytes32 root = MerkleLib.branchRoot(messageId, proof, index);
         StoredIndex storage storedIndex = storedCheckpoints[merkleTree][root];
@@ -33,8 +32,8 @@ contract CheckpointFraudProofs {
     }
 
     modifier onlyMessageInStoredCheckpoint(
-        Checkpoint calldata checkpoint,
-        bytes32[TREE_DEPTH] calldata proof,
+        Checkpoint memory checkpoint,
+        bytes32[TREE_DEPTH] memory proof,
         bytes32 messageId
     ) {
         require(
@@ -50,7 +49,7 @@ contract CheckpointFraudProofs {
     }
 
     function isLocal(
-        Checkpoint calldata checkpoint
+        Checkpoint memory checkpoint
     ) public view returns (bool) {
         address merkleTree = checkpoint.merkleTreeAddress();
         return
@@ -58,7 +57,7 @@ contract CheckpointFraudProofs {
             MerkleTreeHook(merkleTree).localDomain() == checkpoint.origin;
     }
 
-    modifier onlyLocal(Checkpoint calldata checkpoint) {
+    modifier onlyLocal(Checkpoint memory checkpoint) {
         require(isLocal(checkpoint), "must be local checkpoint");
         _;
     }
@@ -82,7 +81,7 @@ contract CheckpointFraudProofs {
      *  @return Whether the provided checkpoint is premature.
      */
     function isPremature(
-        Checkpoint calldata checkpoint
+        Checkpoint memory checkpoint
     ) public view onlyLocal(checkpoint) returns (bool) {
         // count is the number of messages in the mailbox (i.e. the latest index + 1)
         uint32 count = MerkleTreeHook(checkpoint.merkleTreeAddress()).count();
@@ -100,8 +99,8 @@ contract CheckpointFraudProofs {
      *  @return Whether the provided checkpoint has a fraudulent message ID.
      */
     function isFraudulentMessageId(
-        Checkpoint calldata checkpoint,
-        bytes32[TREE_DEPTH] calldata proof,
+        Checkpoint memory checkpoint,
+        bytes32[TREE_DEPTH] memory proof,
         bytes32 actualMessageId
     )
         public
@@ -121,8 +120,8 @@ contract CheckpointFraudProofs {
      *  @return Whether the provided checkpoint has a fraudulent message ID.
      */
     function isFraudulentRoot(
-        Checkpoint calldata checkpoint,
-        bytes32[TREE_DEPTH] calldata proof
+        Checkpoint memory checkpoint,
+        bytes32[TREE_DEPTH] memory proof
     )
         public
         view
