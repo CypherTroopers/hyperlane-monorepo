@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity >=0.8.0;
+pragma solidity ^0.6.0;
 
 // ============ Internal Imports ============
 import {Versioned} from "./upgrade/Versioned.sol";
@@ -25,7 +25,7 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
     // ============ Constants ============
 
     // Domain of chain on which the contract is deployed
-    uint32 public immutable localDomain;
+    uint32 public localDomain;
 
     // ============ Public Storage ============
 
@@ -72,7 +72,7 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
     event RequiredHookSet(address indexed hook);
 
     // ============ Constructor ============
-    constructor(uint32 _localDomain) {
+    constructor(uint32 _localDomain) public {
         localDomain = _localDomain;
     }
 
@@ -82,7 +82,7 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
         address _defaultIsm,
         address _defaultHook,
         address _requiredHook
-    ) external initializer {
+    ) external {
         __Ownable_init();
         setDefaultIsm(_defaultIsm);
         setDefaultHook(_defaultHook);
@@ -102,14 +102,14 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
     function dispatch(
         uint32 _destinationDomain,
         bytes32 _recipientAddress,
-        bytes calldata _messageBody
+        bytes memory _messageBody
     ) external payable override returns (bytes32) {
         return
             dispatch(
                 _destinationDomain,
                 _recipientAddress,
                 _messageBody,
-                _messageBody[0:0],
+                new bytes(0),
                 defaultHook
             );
     }
@@ -125,9 +125,9 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
     function dispatch(
         uint32 destinationDomain,
         bytes32 recipientAddress,
-        bytes calldata messageBody,
-        bytes calldata hookMetadata
-    ) external payable override returns (bytes32) {
+        bytes memory messageBody,
+        bytes memory hookMetadata
+    ) public payable override returns (bytes32) {
         return
             dispatch(
                 destinationDomain,
@@ -149,14 +149,14 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
     function quoteDispatch(
         uint32 destinationDomain,
         bytes32 recipientAddress,
-        bytes calldata messageBody
+        bytes memory messageBody
     ) external view returns (uint256 fee) {
         return
             quoteDispatch(
                 destinationDomain,
                 recipientAddress,
                 messageBody,
-                messageBody[0:0],
+                new bytes(0),
                 defaultHook
             );
     }
@@ -172,9 +172,9 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
     function quoteDispatch(
         uint32 destinationDomain,
         bytes32 recipientAddress,
-        bytes calldata messageBody,
-        bytes calldata defaultHookMetadata
-    ) external view returns (uint256 fee) {
+        bytes memory messageBody,
+        bytes memory defaultHookMetadata
+    ) public view returns (uint256 fee) {
         return
             quoteDispatch(
                 destinationDomain,
@@ -192,9 +192,9 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
      * @param _message Formatted Hyperlane message (refer to Message.sol).
      */
     function process(
-        bytes calldata _metadata,
-        bytes calldata _message
-    ) external payable override {
+        bytes memory _metadata,
+        bytes memory _message
+    ) public payable override {
         /// CHECKS ///
 
         // Check that the message was intended for this mailbox.
@@ -242,7 +242,7 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
      * @param _id The message ID to check.
      * @return The account that processed the message.
      */
-    function processor(bytes32 _id) external view returns (address) {
+    function processor(bytes32 _id) public view returns (address) {
         return deliveries[_id].processor;
     }
 
@@ -251,7 +251,7 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
      * @param _id The message ID to check.
      * @return The number of the block that the message was processed at.
      */
-    function processedAt(bytes32 _id) external view returns (uint48) {
+    function processedAt(bytes32 _id) public view returns (uint48) {
         return deliveries[_id].blockNumber;
     }
 
@@ -269,8 +269,8 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
     function dispatch(
         uint32 destinationDomain,
         bytes32 recipientAddress,
-        bytes calldata messageBody,
-        bytes calldata metadata,
+        bytes memory messageBody,
+        bytes memory metadata,
         IPostDispatchHook hook
     ) public payable virtual returns (bytes32) {
         if (address(hook) == address(0)) {
@@ -318,8 +318,8 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
     function quoteDispatch(
         uint32 destinationDomain,
         bytes32 recipientAddress,
-        bytes calldata messageBody,
-        bytes calldata metadata,
+        bytes memory messageBody,
+        bytes memory metadata,
         IPostDispatchHook hook
     ) public view returns (uint256 fee) {
         if (address(hook) == address(0)) {
@@ -395,9 +395,8 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
     ) public view returns (IInterchainSecurityModule) {
         // use low-level staticcall in case of revert or empty return data
         (bool success, bytes memory returnData) = _recipient.staticcall(
-            abi.encodeCall(
-                ISpecifiesInterchainSecurityModule.interchainSecurityModule,
-                ()
+            abi.encodeWithSelector(
+                ISpecifiesInterchainSecurityModule.interchainSecurityModule.selector
             )
         );
         // check if call was successful and returned data
@@ -417,14 +416,14 @@ contract Mailbox is IMailbox, Indexed, Versioned, OwnableUpgradeable {
     function _buildMessage(
         uint32 destinationDomain,
         bytes32 recipientAddress,
-        bytes calldata messageBody
+        bytes memory messageBody
     ) internal view returns (bytes memory) {
         return
             Message.formatMessage(
                 VERSION,
                 nonce,
                 localDomain,
-                msg.sender.addressToBytes32(),
+                TypeCasts.addressToBytes32(msg.sender),
                 destinationDomain,
                 recipientAddress,
                 messageBody
